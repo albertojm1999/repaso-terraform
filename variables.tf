@@ -42,7 +42,7 @@ variable "salidas-grupo-seguridad-bastion" {
 }
 
 variable "entradas-grupo-seguridad-privada" {
-    description = "Reglas de entrada para la instancia pública"
+    description = "Reglas de entrada para la instancia privada"
     type = map(object({
         cidr_ipv4 = list(string)
         from_port = number
