@@ -1,11 +1,12 @@
 output "direcciones-publica-bastion" {
-    value = aws_instance.instancia-bastion.public_ip
+    value = aws_eip.eip_bastion.public_ip
     description = "Mostrar la ip pública de la instancia que contiene el bastión."
 }
 
 output "direccion-privada-bastion" {
     value = aws_instance.instancia-bastion.private_ip
     description = "Mostrar la ip privada de la instancia que contiene el bastión."
+    sensitive = true
 }
 
 output "direccion-privada-privada" {

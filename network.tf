@@ -31,10 +31,17 @@ resource "aws_subnet" "subred-privada" {
     }
 }
 
+resource "aws_subnet" "subnet-nat" {
+    vpc_id = aws_vpc.my-vpc[1].id
+    cidr_block = var.cidr-group-subnet["nat"]
+    availability_zone       = var.zona_disponibilidad[0]
+}
+
 resource "aws_internet_gateway" "igw" {
-    vpc_id = aws_vpc.my-vpc[0].id
+    count      = length(var.cidr-groups-vpc)
+    vpc_id = aws_vpc.my-vpc[count.index].id
     tags = {
-        Name = "mi-internet-gateway"
+        Name = "mi-internet-gateway-${count.index}"
     }
 }
 
@@ -42,7 +49,7 @@ resource "aws_route_table" "table-route-public" {
     vpc_id         = aws_vpc.my-vpc[0].id
     route {
         cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.igw.id
+        gateway_id = aws_internet_gateway.igw[0].id
     }
 
     route {
@@ -55,20 +62,38 @@ resource "aws_route_table" "table-route-public" {
     }
 }
 
-resource "aws_route_table_association" "asoc-publica" {
-    subnet_id      = aws_subnet.subred-publica.id
-    route_table_id = aws_route_table.table-route-public.id
-}
-
 resource "aws_route_table" "table-route-private" {
     vpc_id                        = aws_vpc.my-vpc[1].id
     route {
         cidr_block                = "172.16.0.0/16"
         vpc_peering_connection_id = aws_vpc_peering_connection.vpc1_vpc0.id
     }
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        nat_gateway_id = aws_nat_gateway.nat_privada.id
+    }
     tags = {
         Name = "mi-table-route-private"
     }
+}
+
+resource "aws_route_table" "table-route-vpc1" {
+    vpc_id = aws_vpc.my-vpc[1].id
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.igw[1].id
+    }
+}
+
+resource "aws_route_table_association" "asoc-nat" {
+    subnet_id = aws_subnet.subnet-nat.id
+    route_table_id = aws_route_table.table-route-vpc1.id
+}
+
+resource "aws_route_table_association" "asoc-publica" {
+    subnet_id      = aws_subnet.subred-publica.id
+    route_table_id = aws_route_table.table-route-public.id
 }
 
 resource "aws_route_table_association" "asoc-privada" {
@@ -76,4 +101,21 @@ resource "aws_route_table_association" "asoc-privada" {
     route_table_id = aws_route_table.table-route-private.id
 }
 
+resource "aws_nat_gateway" "nat_privada" {
+    subnet_id = aws_subnet.subnet-nat.id
+    depends_on = [aws_internet_gateway.igw]
+    allocation_id = aws_eip.eip-nat.id
+    tags = {
+        Name = "nat_instancia_privada"
+    }
+}
 
+resource "aws_eip" "eip_bastion" {
+    instance = aws_instance.instancia-bastion.id
+    depends_on = [aws_internet_gateway.igw]
+}
+
+resource "aws_eip" "eip-nat" {
+    domain = "vpc"
+    depends_on = [aws_internet_gateway.igw]
+}
